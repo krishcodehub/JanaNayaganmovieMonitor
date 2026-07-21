@@ -53,6 +53,7 @@ ${config.movie.url}`
 async function startMonitoring() {
 
     console.log("🚀 JanaMonitor Started");
+    console.log("Version: 2026-07-21-Headless-v2");
 console.log("Running latest code - headless mode");
 
 const browser = await chromium.launch({
