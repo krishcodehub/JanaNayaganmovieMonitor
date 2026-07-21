@@ -10,8 +10,7 @@ async function theatreExists(page, theatreName) {
     console.log(`Searching : ${theatreName}`);
 
     const theatre = page
-        .getByLabel("grid")
-        .getByText(theatreName);
+        .getByText(theatreName, { exact: false });
 
     const count = await theatre.count();
 
