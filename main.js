@@ -2,90 +2,195 @@ const { chromium } = require("@playwright/test");
 const config = require("./config/config");
 const { sendTelegramMessage } = require("./utils/telegram");
 
-const notifiedTheatres = new Set();
+const notifiedShows = new Set();
+
+async function scrollToTop(page) {
+    await page.evaluate(() => {
+        window.scrollTo(0, 0);
+    });
+
+    await page.waitForTimeout(1500);
+}
+
+async function scrollDown(page) {
+
+    await page.mouse.wheel(0, 900);
+
+    await page.waitForTimeout(1200);
+}
 
 async function theatreExists(page, theatreName) {
 
-    console.log("---------------------------------------");
-    console.log(`Searching : ${theatreName}`);
+    console.log("----------------------------------------");
+    console.log(`Searching Theatre : ${theatreName}`);
 
-    const theatre = page
-        .getByText(theatreName, { exact: false });
+    for (let i = 0; i < 40; i++) {
 
-    const count = await theatre.count();
+        const theatre = page.getByText(theatreName, {
+            exact: false
+        });
 
-    if (count > 0) {
+        if (await theatre.count() > 0) {
 
-        console.log(`✅ ${theatreName} Listed`);
+            console.log(`✅ Theatre Found : ${theatreName}`);
 
-        if (!notifiedTheatres.has(theatreName)) {
+            await theatre.first().scrollIntoViewIfNeeded();
 
-            notifiedTheatres.add(theatreName);
+            await page.waitForTimeout(1000);
 
-            await sendTelegramMessage(
-`🎉 JanaMonitor Alert
-
-Movie : ${config.movie.name}
-Date : ${config.movie.date}
-
-🏢 Theatre Listed
-
-${theatreName}
-
-${config.movie.url}`
-            );
-
-            console.log("📨 Telegram Sent");
-        }
-        else {
-            console.log("ℹ️ Already Notified");
+            return true;
         }
 
-        return true;
+        await scrollDown(page);
     }
 
-    console.log(`❌ ${theatreName} Not Listed`);
+    console.log(`❌ Theatre Not Found : ${theatreName}`);
 
     return false;
 }
+async function checkShow(page, theatreName, theatreConfig) {
+
+    const found = await theatreExists(page, theatreName);
+
+    if (!found) {
+        return null;
+    }
+
+    // Fixed show (Gokulam / Kaveri)
+
+    if (theatreConfig.showTime) {
+
+        console.log(`Checking Show : ${theatreConfig.showTime}`);
+
+        const button = page.getByRole("button", {
+            name: new RegExp(theatreConfig.showTime, "i")
+        });
+
+        if (await button.count() > 0) {
+
+            console.log(`🎉 Booking Open : ${theatreName}`);
+
+            return {
+                theatre: theatreName,
+                show: theatreConfig.showTime
+            };
+        }
+
+        console.log(`❌ ${theatreConfig.showTime} Not Open`);
+
+        return null;
+    }
+
+    // Morning shows (06:00–10:00)
+
+    const morningShows = [
+        "06:00 AM",
+        "06:30 AM",
+        "07:00 AM",
+        "07:30 AM",
+        "08:00 AM",
+        "08:30 AM",
+        "09:00 AM",
+        "09:05 AM",
+        "09:10 AM",
+        "09:15 AM",
+        "09:20 AM",
+        "09:25 AM",
+        "09:30 AM",
+        "09:35 AM",
+        "09:40 AM",
+        "09:45 AM",
+        "09:50 AM",
+        "09:55 AM",
+        "10:00 AM"
+    ];
+
+    for (const show of morningShows) {
+        console.log(`Checking Show : ${show}`);
+
+        const button = page.getByRole("button", {
+            name: new RegExp(show, "i")
+        });
+
+        if (await button.count() > 0) {
+            console.log(`🎉 Booking Open : ${theatreName}`);
+            return {
+                theatre: theatreName,
+                show
+            };
+        }
+    }
+
+    console.log(`❌ No morning show open for ${theatreName}`);
+    return null;
+}
 
 async function startMonitoring() {
+    console.log("🚀 JanaMonitor Started...");
 
-    console.log("🚀 JanaMonitor Started");
-    console.log("Version: 2026-07-21-Headless-v2");
-console.log("Running latest code - headless mode");
-
-const browser = await chromium.launch({
-    headless: true
-});
+    const browser = await chromium.launch({
+        headless: false
+    });
 
     const page = await browser.newPage();
 
     while (true) {
-
         try {
-
             await page.goto(config.movie.url, {
-                waitUntil: "domcontentloaded"
+                waitUntil: "networkidle"
             });
+
+            await scrollToTop(page);
 
             console.log("");
             console.log("======================================");
-            console.log(new Date().toLocaleString());
             console.log("Checking Theatre Availability...");
+            console.log(new Date().toLocaleString());
             console.log("======================================");
 
+            let bookingFound = false;
+
             for (const theatre of config.theatres) {
+                const result = await checkShow(
+                    page,
+                    theatre.name,
+                    theatre
+                );
 
-                await theatreExists(page, theatre.name);
+                if (result) {
+                    bookingFound = true;
+                    const key = `${result.theatre}-${result.show}`;
 
+                    if (!notifiedShows.has(key)) {
+                        notifiedShows.add(key);
+
+                        await sendTelegramMessage(
+`🎉 JanaMonitor Alert
+
+Movie : ${config.movie.name}
+
+🏢 Theatre : ${result.theatre}
+
+🕒 Show : ${result.show}
+
+Booking is Available.
+
+${config.movie.url}`
+                        );
+
+                        console.log("📨 Telegram Sent");
+                    }
+                }
             }
 
-        }
-        catch (e) {
-
-            console.log("Error :", e.message);
-
+            if (!bookingFound) {
+                console.log("");
+                console.log("❌ Booking NOT OPEN");
+                console.log("Checked All Configured Theatres");
+                console.log("");
+            }
+        } catch (error) {
+            console.log("❌ Error :", error.message);
         }
 
         console.log("");
@@ -93,9 +198,7 @@ const browser = await chromium.launch({
         console.log("");
 
         await page.waitForTimeout(config.checkInterval);
-
     }
-
 }
 
 startMonitoring();
