@@ -7,25 +7,25 @@ module.exports = {
 
     theatres: [
         {
-            name: "Gokulam Cinemas A/C 2K",
+            name: "Gokulam",
             showTime: "12:30 PM"
         },
         {
-            name: "Kaveri Cinema: Coimbatore",
+            name: "Kaveri",
             showTime: "12:30 PM"
         },
         {
-            name: "Broadway Cinemas: Coimbatore",
+            name: "Broadway",
             startTime: "06:00",
             endTime: "10:00"
         },
         {
-            name: "PVR: Brookefields Mall, Coimbatore",
+            name: "Brookefields Mall",
             startTime: "06:00",
             endTime: "10:00"
         },
         {
-            name: "INOX: Prozone Mall, Coimbatore",
+            name: "Prozone Mall",
             startTime: "06:00",
             endTime: "10:00"
         },
