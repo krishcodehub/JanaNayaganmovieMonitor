@@ -53,10 +53,11 @@ ${config.movie.url}`
 async function startMonitoring() {
 
     console.log("🚀 JanaMonitor Started");
+console.log("Running latest code - headless mode");
 
-    const browser = await chromium.launch({
-        headless: true
-    });
+const browser = await chromium.launch({
+    headless: true
+});
 
     const page = await browser.newPage();
 
